@@ -1,30 +1,52 @@
 import React from "react";
 import { Button, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import ForegroundService from '@supersami/rn-foreground-service';
+// Đã thêm AndroidForegroundServiceType ở đây 👇
+import notifee, { AndroidImportance, AndroidForegroundServiceType } from '@notifee/react-native';
 import { stopBackgroundServices, backgroundTranslationTask } from '@/services/BackgroundTranslationTask';
+
+notifee.registerForegroundService((notification) => {
+  return new Promise(() => {
+    console.log("🚀 [Notifee Task] Bắt đầu chạy ngầm vô tận...");
+    backgroundTranslationTask();
+  });
+});
 
 const New = () => {
 
   const startBackgroundTranslation = async () => {
     console.log("🚀 Yêu cầu bật dịch thuật chạy ngầm...");
     
-    ForegroundService.start({  // ✅ dùng .start() không phải .startService()
-      id: 144,
-      title: "Gemini Live AI",
-      message: "Đang nghe và dịch thuật realtime 24/7...",
-      icon: "ic_launcher",
-      button: false,
-	  serviceType: "microphone"
-    });
+    try {
+      await notifee.requestPermission();
 
-    await backgroundTranslationTask(); // ✅ gọi task thực sự
+      const channelId = await notifee.createChannel({
+        id: 'gemini_live_channel',
+        name: 'AI Translation Service',
+        importance: AndroidImportance.HIGH,
+      });
+
+      await notifee.displayNotification({
+        title: '🎧 Gemini Live AI',
+        body: 'Đang nghe và dịch thuật realtime 24/7...',
+        android: {
+          channelId,
+          asForegroundService: true, 
+          ongoing: true, 
+          // 👇 DÙNG ENUM CHUẨN CỦA NOTIFEE 👇
+        },
+      });
+
+      console.log("✅ Đã ra lệnh cho hệ thống bật Notifee!");
+    } catch (error) {
+      console.error("❌ Lỗi khi bật Notifee:", error);
+    }
   };
 
-  const stopBackgroundTranslation = () => {
+  const stopBackgroundTranslation = async () => {
     console.log("⏹️ Yêu cầu tắt dịch thuật chạy ngầm...");
     stopBackgroundServices();
-    ForegroundService.stop(); // ✅ dùng .stop()
+    await notifee.stopForegroundService(); 
   };
 
   return (
