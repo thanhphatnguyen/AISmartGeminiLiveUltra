@@ -1,28 +1,30 @@
 import React from "react";
 import { Button, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-// Giả định bạn sẽ dùng một thư viện quản lý Foreground Service (VD: @supersami/rn-foreground-service)
-import ForegroundService from 'react-native-foreground-service'; 
-import { stopBackgroundServices } from '@/services/BackgroundTranslationTask';
+import ForegroundService from '@supersami/rn-foreground-service';
+import { stopBackgroundServices, backgroundTranslationTask } from '@/services/BackgroundTranslationTask';
 
 const New = () => {
 
-  const startBackgroundTranslation = () => {
+  const startBackgroundTranslation = async () => {
     console.log("🚀 Yêu cầu bật dịch thuật chạy ngầm...");
-    // Kích hoạt Notification dính cứng trên Android để app không bị OS "trảm"
-    ForegroundService.startService({
+    
+    ForegroundService.start({  // ✅ dùng .start() không phải .startService()
       id: 144,
       title: "Gemini Live AI",
       message: "Đang nghe và dịch thuật realtime 24/7...",
-      icon: "ic_launcher", 
+      icon: "ic_launcher",
       button: false,
+	  serviceType: "microphone"
     });
+
+    await backgroundTranslationTask(); // ✅ gọi task thực sự
   };
 
   const stopBackgroundTranslation = () => {
     console.log("⏹️ Yêu cầu tắt dịch thuật chạy ngầm...");
-	stopBackgroundServices(); // <-- Đập chết mic, loa và socket
-    ForegroundService.stopService();
+    stopBackgroundServices();
+    ForegroundService.stop(); // ✅ dùng .stop()
   };
 
   return (
