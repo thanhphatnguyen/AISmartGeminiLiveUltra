@@ -26,15 +26,15 @@ export const backgroundTranslationTask = async (taskData?: any) => {
   try {
     // Đọc settings từ AsyncStorage
     const savedApiKey = await AsyncStorage.getItem(SETTINGS_KEYS.API_KEY);
-    const savedModel  = await AsyncStorage.getItem(SETTINGS_KEYS.MODEL);
+    const savedModel = await AsyncStorage.getItem(SETTINGS_KEYS.MODEL);
     const savedPrompt = await AsyncStorage.getItem(SETTINGS_KEYS.PROMPT);
 
     const apiKey = (savedApiKey && savedApiKey.trim()) ? savedApiKey.trim() : DEFAULT_SETTINGS.apiKey;
-    const model  = (savedModel  && savedModel.trim())  ? savedModel.trim()  : DEFAULT_SETTINGS.model;
+    const model = (savedModel && savedModel.trim()) ? savedModel.trim() : DEFAULT_SETTINGS.model;
     const prompt = (savedPrompt && savedPrompt.trim()) ? savedPrompt.trim() : DEFAULT_SETTINGS.prompt;
 
     if (!apiKey) {
-      console.error("❌ [BackgroundTask] Chưa có API Key. Vào ⚙️ Settings để nhập.");
+      console.error("❌ [BackgroundTask] Chưa có API Key! Vào Settings để nhập.");
       return;
     }
 
@@ -46,13 +46,14 @@ export const backgroundTranslationTask = async (taskData?: any) => {
       audioPlayerService.play(base64Audio, 24000);
     };
 
-    // Bước 2: Kết nối thẳng WebSocket tới Gemini bằng API key của người dùng
+    // Bước 2: Kết nối thẳng WebSocket tới Gemini bằng API key
     await geminiSocketService.connect(apiKey, model, prompt);
 
-    // Bước 3: Chờ Gemini Setup xong rồi bật mic
+    // Bước 3: Chờ Gemini Setup xong, sau đó BẬT MIC thu âm
     const checkSetup = setInterval(() => {
       if (geminiSocketService.isInitialized) {
         clearInterval(checkSetup);
+
         console.log("🎙️ [BackgroundTask] AI đã sẵn sàng. Bắt đầu nghe...");
 
         audioStreamService.startStreaming(
@@ -69,7 +70,7 @@ export const backgroundTranslationTask = async (taskData?: any) => {
     console.error("❌ [BackgroundTask] Lỗi hệ thống:", error);
   }
 
-  // Giữ tiến trình chạy ngầm sống vô tận
+  // Giữ cho tiến trình chạy ngầm này sống vô tận
   return new Promise(() => {});
 };
 

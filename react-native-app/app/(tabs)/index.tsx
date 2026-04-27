@@ -61,11 +61,24 @@ const New = () => {
 
   const saveSettings = async () => {
     try {
+      // 1. Lưu cấu hình vào bộ nhớ máy
       await AsyncStorage.setItem(SETTINGS_KEYS.API_KEY, apiKey);
       await AsyncStorage.setItem(SETTINGS_KEYS.MODEL, model);
       await AsyncStorage.setItem(SETTINGS_KEYS.PROMPT, prompt);
-      console.log("✅ Đã lưu settings.");
+      
+      // 2. 👉 THÊM DÒNG NÀY: Dừng ngay lập tức các dịch vụ chạy ngầm cũ
+      stopBackgroundServices(); 
+      
+      // 3. 👉 THÊM DÒNG NÀY: Gỡ bỏ thông báo trên thanh trạng thái
+      await notifee.stopForegroundService();
+
+      console.log("✅ Đã lưu settings và dừng các tiến trình cũ.");
+      
       setSettingsVisible(false);
+      
+      // Tùy chọn: Hiện thông báo cho người dùng biết
+      // Alert.alert("Đã lưu", "Cấu hình mới đã được áp dụng. Vui lòng bấm Bắt đầu để chạy lại.");
+      
     } catch (e) {
       console.error("❌ Lỗi lưu settings:", e);
     }
@@ -151,7 +164,7 @@ const New = () => {
       >
         <KeyboardAvoidingView
           style={styles.modalOverlay}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          behavior={Platform.OS === "ios" ? "padding" : "undefined"}
         >
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>

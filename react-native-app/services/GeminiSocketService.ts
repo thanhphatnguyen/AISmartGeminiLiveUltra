@@ -19,20 +19,32 @@ class GeminiSocketService {
   public onSocketError?: (error: any) => void;
 
   /**
-   * Kết nối tới Gemini Live API
+   * Kết nối tới Gemini Live API bằng API key trực tiếp
    */
-  public async connect(ephemeralKey: string) {
+  public async connect(apiKey: string, model: string, prompt: string) {
     if (this.ws) return;
 
-    const url = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token=${ephemeralKey}`;
-    
+    // Dùng ?key= thay vì ?access_token= khi kết nối bằng API key thông thường
+    const url = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${apiKey}`;
+
     this.ws = new WebSocket(url);
 
     this.ws.onopen = () => {
       console.log("🌐 [GeminiSocket] Đã kết nối.");
       this.isConnected = true;
-      // Gửi config ban đầu
-      const setupMessage: LiveClientMessage = { setup: {} };
+
+      // Gửi config ban đầu kèm model và system instruction (prompt)
+      const setupMessage: LiveClientMessage = {
+        setup: {
+          model: `models/${model}`,
+          systemInstruction: {
+            parts: [{ text: prompt }],
+          },
+          generationConfig: {
+            responseModalities: ["AUDIO"],
+          },
+        },
+      };
       this.ws?.send(JSON.stringify(setupMessage));
     };
 
