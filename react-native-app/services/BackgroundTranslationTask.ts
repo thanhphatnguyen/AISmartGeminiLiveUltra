@@ -3,57 +3,73 @@
 import { audioStreamService } from './AudioStreamService';
 import { geminiSocketService } from './GeminiSocketService';
 import { audioPlayerService } from './AudioPlayerService';
-
-// TODO: Đổi thành IP local hoặc ngrok URL của bạn
-const localIpAddress = "https://wedded-dovie-uninstructedly.ngrok-free.dev"; 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const TASK_NAME = "TranslationBackgroundTask";
+
+const SETTINGS_KEYS = {
+  API_KEY: "settings_api_key",
+  MODEL: "settings_model",
+  PROMPT: "settings_prompt",
+};
+
+const DEFAULT_SETTINGS = {
+  apiKey: "",
+  model: "gemini-3.1-flash-live-preview",
+  prompt: "Bạn là một thông dịch viên, khi nghe tiếng Đức hãy phiên dịch sang tiếng Việt, không nói gì thêm, không giải thích gì thêm!",
+};
 
 // 1. HÀM CHÍNH: KHỞI ĐỘNG CHẠY NGẦM
 export const backgroundTranslationTask = async (taskData?: any) => {
   console.log("🚀 [BackgroundTask] Bắt đầu quá trình dịch thuật ngầm...");
 
   try {
-    // Bước 1: Lấy Token từ server Express (app.js)
-    console.log("🔄 [BackgroundTask] Đang lấy token...");
-    const response = await fetch(`${localIpAddress}/session`);
-    const data = await response.json();
-    const ephemeralKey = data.token.name;
-    console.log("✅ [BackgroundTask] Đã có token, chuẩn bị kết nối Gemini!");
+    // Đọc settings từ AsyncStorage
+    const savedApiKey = await AsyncStorage.getItem(SETTINGS_KEYS.API_KEY);
+    const savedModel  = await AsyncStorage.getItem(SETTINGS_KEYS.MODEL);
+    const savedPrompt = await AsyncStorage.getItem(SETTINGS_KEYS.PROMPT);
 
-    // Bước 2: Lắng nghe kết quả từ AI và phát ra loa
+    const apiKey = (savedApiKey && savedApiKey.trim()) ? savedApiKey.trim() : DEFAULT_SETTINGS.apiKey;
+    const model  = (savedModel  && savedModel.trim())  ? savedModel.trim()  : DEFAULT_SETTINGS.model;
+    const prompt = (savedPrompt && savedPrompt.trim()) ? savedPrompt.trim() : DEFAULT_SETTINGS.prompt;
+
+    if (!apiKey) {
+      console.error("❌ [BackgroundTask] Chưa có API Key. Vào ⚙️ Settings để nhập.");
+      return;
+    }
+
+    console.log(`📋 [BackgroundTask] Model: ${model}`);
+    console.log(`📋 [BackgroundTask] Prompt: ${prompt.substring(0, 60)}...`);
+
+    // Bước 1: Lắng nghe kết quả từ AI và phát ra loa
     geminiSocketService.onAudioResponseComplete = (base64Audio) => {
-      // AI trả về sample rate mặc định là 24000
       audioPlayerService.play(base64Audio, 24000);
     };
 
-    // Bước 3: Kết nối WebSocket với Gemini
-    await geminiSocketService.connect(ephemeralKey);
+    // Bước 2: Kết nối thẳng WebSocket tới Gemini bằng API key của người dùng
+    await geminiSocketService.connect(apiKey, model, prompt);
 
-    // Bước 4: Chờ Gemini Setup xong, sau đó BẬT MIC thu âm
+    // Bước 3: Chờ Gemini Setup xong rồi bật mic
     const checkSetup = setInterval(() => {
       if (geminiSocketService.isInitialized) {
-        clearInterval(checkSetup); // Ngừng kiểm tra khi đã setup xong
-
+        clearInterval(checkSetup);
         console.log("🎙️ [BackgroundTask] AI đã sẵn sàng. Bắt đầu nghe...");
-        
+
         audioStreamService.startStreaming(
-          16000, // sampleRate thu âm
-          250,   // interval: cắt mảng 250ms một lần
+          16000,
+          250,
           (base64Chunk) => {
-            // Liên tục bắn các đoạn thu âm nhỏ lên Server Gemini
-            // AI (model gemini-3.1-flash-live-preview) sẽ tự nghe và dịch
             geminiSocketService.sendAudioChunk(base64Chunk);
           }
         );
       }
-    }, 500); // Mỗi 0.5s kiểm tra 1 lần xem websocket đã 'isInitialized' chưa
+    }, 500);
 
   } catch (error) {
     console.error("❌ [BackgroundTask] Lỗi hệ thống:", error);
   }
 
-  // Giữ cho tiến trình chạy ngầm này sống vô tận bằng một Promise không bao giờ kết thúc
+  // Giữ tiến trình chạy ngầm sống vô tận
   return new Promise(() => {});
 };
 
