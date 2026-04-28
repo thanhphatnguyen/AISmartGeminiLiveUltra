@@ -10,6 +10,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
+  Alert,              // 👈 CẦN ĐỂ HIỆN POPUP
+  DeviceEventEmitter  // 👈 CẦN ĐỂ NGHE BÁO LỖI TỪ SOCKET
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -43,6 +45,15 @@ const New = () => {
 
   useEffect(() => {
     loadSettings();
+
+    // 👉 LẮNG NGHE TÍN HIỆU LỖI TỪ TẦNG HẦM (Do file GeminiSocketService bắn lên)
+    const errorListener = DeviceEventEmitter.addListener("API_ERROR", () => {
+      Alert.alert("Lỗi Kết Nối", "Check API key bitten");
+    });
+
+    return () => {
+      errorListener.remove(); // Dọn dẹp khi tắt màn hình
+    };
   }, []);
 
   const loadSettings = async () => {
@@ -60,24 +71,31 @@ const New = () => {
   };
 
   const saveSettings = async () => {
+    // 👉 CHẶN: KHÔNG CHO LƯU NẾU API KEY BỊ TRỐNG
+    if (!apiKey || apiKey.trim() === "") {
+      Alert.alert("Thiếu thông tin", "Google API Key là bắt buộc, không được để trống!");
+      return;
+    }
+	if (!model || model.trim() === "") {
+      Alert.alert("Thiếu thông tin", "Google Model là bắt buộc, không được để trống!");
+      return;
+    }
+
     try {
       // 1. Lưu cấu hình vào bộ nhớ máy
       await AsyncStorage.setItem(SETTINGS_KEYS.API_KEY, apiKey);
       await AsyncStorage.setItem(SETTINGS_KEYS.MODEL, model);
       await AsyncStorage.setItem(SETTINGS_KEYS.PROMPT, prompt);
       
-      // 2. 👉 THÊM DÒNG NÀY: Dừng ngay lập tức các dịch vụ chạy ngầm cũ
+      // 2. Dừng ngay lập tức các dịch vụ chạy ngầm cũ
       stopBackgroundServices(); 
       
-      // 3. 👉 THÊM DÒNG NÀY: Gỡ bỏ thông báo trên thanh trạng thái
+      // 3. Gỡ bỏ thông báo trên thanh trạng thái
       await notifee.stopForegroundService();
 
       console.log("✅ Đã lưu settings và dừng các tiến trình cũ.");
       
       setSettingsVisible(false);
-      
-      // Tùy chọn: Hiện thông báo cho người dùng biết
-      // Alert.alert("Đã lưu", "Cấu hình mới đã được áp dụng. Vui lòng bấm Bắt đầu để chạy lại.");
       
     } catch (e) {
       console.error("❌ Lỗi lưu settings:", e);
@@ -85,6 +103,13 @@ const New = () => {
   };
 
   const startBackgroundTranslation = async () => {
+    // 👉 CHẶN: YÊU CẦU NHẬP API KEY TRƯỚC KHI CHẠY
+    if (!apiKey || apiKey.trim() === "") {
+      Alert.alert("Yêu cầu", "Vui lòng nhập Google API Key trước khi bắt đầu!");
+      setSettingsVisible(true); // Tự động mở bảng cài đặt
+      return;
+    }
+
     console.log("🚀 Yêu cầu bật dịch thuật chạy ngầm...");
 
     try {
@@ -164,7 +189,7 @@ const New = () => {
       >
         <KeyboardAvoidingView
           style={styles.modalOverlay}
-          behavior={Platform.OS === "ios" ? "padding" : "undefined"}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
@@ -179,12 +204,14 @@ const New = () => {
               keyboardShouldPersistTaps="handled"
             >
               {/* API Key */}
-              <Text style={styles.label}>🔑 Google API Key</Text>
+              <Text style={styles.label}>
+                🔑 Google API Key <Text style={{ color: "red" }}>*</Text>
+              </Text>
               <TextInput
                 style={styles.input}
                 value={apiKey}
                 onChangeText={setApiKey}
-                placeholder="Nhập API Key của bạn..."
+                placeholder="Bắt buộc nhập API Key..."
                 placeholderTextColor="#666"
                 secureTextEntry={true}
                 autoCapitalize="none"

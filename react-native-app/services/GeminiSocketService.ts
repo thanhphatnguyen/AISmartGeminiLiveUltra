@@ -4,6 +4,7 @@ import {
   type UsageMetadata,
 } from "@google/genai";
 import { Buffer } from "buffer";
+import { Alert } from "react-native"; // 👈 LÔI THẲNG GIAO DIỆN POPUP VÀO ĐÂY
 
 class GeminiSocketService {
   private ws: WebSocket | null = null;
@@ -17,6 +18,7 @@ class GeminiSocketService {
   public onMessageReceived?: (message: LiveServerMessage) => void;
   public onUsageReport?: (usage: UsageMetadata) => void;
   public onSocketError?: (error: any) => void;
+  public onSocketClosed?: () => void; // Callback cho vụ rớt mạng 10 phút
 
   /**
    * Kết nối tới Gemini Live API bằng API key trực tiếp
@@ -50,6 +52,20 @@ class GeminiSocketService {
 
     this.ws.onclose = () => {
       console.log("🌐 [GeminiSocket] Đã ngắt kết nối.");
+
+      // 👉 BẮT BỆNH: Mở rồi nhưng đóng liền chưa kịp Setup -> Sai API Key
+      if (this.isConnected && !this.isInitialized) {
+        console.log("❌ Bị ngắt kết nối đột ngột! Do sai API Key.");
+        
+        // 💥 BẮN THẲNG POPUP GIAO DIỆN RA MÀN HÌNH!
+        Alert.alert("Lỗi", "Check API key bitten"); 
+        
+        this.onSocketError?.("API_KEY_INVALID");
+      } else {
+        // Trường hợp rớt mạng bình thường (ví dụ quá 10 phút)
+        this.onSocketClosed?.();
+      }
+
       this.resetState();
     };
 
